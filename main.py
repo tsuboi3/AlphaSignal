@@ -13,6 +13,11 @@ import sys
 import json
 import time
 import warnings
+from dotenv import load_dotenv
+
+# 環境変数の読み込み
+load_dotenv()
+
 warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 

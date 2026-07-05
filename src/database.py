@@ -9,11 +9,15 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import Optional, List
+from dotenv import load_dotenv
 
+# モジュールレベルでの環境変数読み込み（独立実行用）
+load_dotenv()
 
 class DatabaseManager:
-    def __init__(self, db_path: str = "alphasignal.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        # 環境変数 DB_NAME があれば優先、なければ引数、それもなければデフォルト
+        self.db_path = db_path or os.getenv("DB_NAME", "alphasignal.db")
         self._init_db()
 
     def _get_connection(self):

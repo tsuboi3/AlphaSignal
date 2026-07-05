@@ -5,11 +5,15 @@ FinBERTによる感情分析とニュースインパクト指数の計算
 
 import pandas as pd
 import numpy as np
+import os
 from datetime import datetime
-
+from dotenv import load_dotenv
 
 from src.database import db_manager
 
+# 環境変数の読み込み
+load_dotenv()
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 
 def fetch_news_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     """

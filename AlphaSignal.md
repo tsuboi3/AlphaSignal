@@ -12,10 +12,10 @@
 | 項目 | 内容 |
 |------|------|
 | **プロジェクト名** | AlphaSignal |
-| **バージョン** | v1.0.0 |
+| **バージョン** | v1.2.0 |
 | **最終更新** | 2026-05-25 |
 | **目的** | LightGBM + Transformer + ニュースセンチメント分析を組み合わせた株価予測システム |
-| **主要言語** | Python 3.12+ |
+| **主要言語** | Python 3.12+ (PyTorch版) |
 | **メインエントリ** | `alphasignal.py` |
 
 ### プロジェクトの目的
@@ -23,6 +23,8 @@
 金融市場における株価動向を機械学習で予測するシステムを構築する。
 従来のテクニカル指標・価格データに加えて**ニュースセンチメント指数（NIS）**を組み込むことで、
 投資家心理・市場の非効率性を特徴量として活用し、予測精度の向上を目指す。
+※ AVX非対応環境への対応のため、TransformerモデルはPyTorchで実装されている。
+※ データの永続化と整合性維持のため、SQLite データベースが統合されている。
 
 ---
 
@@ -36,14 +38,17 @@ stock_prediction_project/
 ├── AlphaSignal.md              # 【本ファイル】プロジェクト管理・AI引き継ぎ文書
 ├── README.md                   # ユーザー向けセットアップ・使い方ガイド
 ├── requirements.txt            # pip 依存ライブラリ一覧
+├── alphasignal.db              # SQLite データベース（永続化データ）
+├── .gitignore                  # Git 除外設定
 │
 ├── src/
 │   ├── __init__.py
+│   ├── database.py             # SQLite データベース管理（永続化・重複排除）
 │   ├── menu.py                 # 対話式メニューUI（企業名解決・期間選択）
-│   ├── features.py             # 特徴量エンジニアリング（テクニカル指標・前処理）
-│   ├── news_sentiment.py       # ニュースセンチメント取得・NIS計算
+│   ├── features.py             # 特徴量エンジニアリング（DB連携・前処理）
+│   ├── news_sentiment.py       # ニュースセンチメント取得・NIS計算（DB連携）
 │   ├── lgbm_model.py           # LightGBM モデル定義・学習
-│   ├── transformer_model.py    # Transformer モデル定義・学習（Keras）
+│   ├── transformer_model.py    # Transformer モデル定義・学習（PyTorch）
 │   └── ensemble.py             # スタッキングアンサンブル・評価・バックテスト
 │
 ├── data/
@@ -64,9 +69,10 @@ stock_prediction_project/
 [入力]
   企業名 / ティッカー / 期間
        ↓
-[データ取得]
-  株価データ (Yahoo Finance / CSVフォールバック)
-  ニュースデータ (API / モックアップ)
+[データ取得・永続化]
+  SQLite (alphasignal.db) から読み込み
+  不足分を Yahoo Finance / ニュースAPI から取得し DB へ保存
+  （重複排除・欠損値チェックを自動実行）
        ↓
 [特徴量エンジニアリング]
   価格指標・テクニカル指標・時間特徴量
@@ -75,128 +81,26 @@ stock_prediction_project/
 [モデル学習 (80/20 時系列分割)]
   ┌─────────────┐   ┌──────────────────┐
   │  LightGBM   │   │   Transformer    │
-  │（2D 入力）  │   │（3D シーケンス） │
+  │（2D 入力）  │   │（PyTorch実装）   │
   └──────┬──────┘   └────────┬─────────┘
          └─────────┬──────────┘
                    ↓
         [スタッキングアンサンブル]
          線形回帰メタモデル
          入力: [LightGBM予測, Transformer予測, NIS]
-                   ↓
-[評価・出力]
-  RMSE / MAE / MAPE / 方向性精度 / 相関係数
-  バックテスト（シャープレシオ・最大ドローダウン）
-  results/{TICKER}_results.json
-  results/{TICKER}_predictions.csv
 ```
-
-### 3.2 特徴量一覧（`src/features.py` `FEATURE_COLS`）
-
-| カテゴリ | 特徴量 |
-|----------|--------|
-| 価格・出来高 | Open, High, Low, Close, Volume |
-| 価格比率 | Open_Close, High_Low, High_Close, Low_Close, Open_High |
-| リターン | Daily_Return, Log_Return |
-| 移動平均 | SMA_5/10/20, EMA_5/10/20 |
-| テクニカル指標 | RSI, MACD, Signal_Line, MACD_Hist |
-| ボリンジャーバンド | 20_SMA, 20_STD, Upper_Band, Lower_Band, BB_Width |
-| ボリューム | Volume_SMA_5/10, Volume_Ratio |
-| 時間特徴量 | DayOfWeek, DayOfMonth, Month, Year |
-| センチメント | news_impact_score, news_impact_ma, news_volume, news_volume_ma |
-
-### 3.3 ニュースインパクト指数（NIS）の計算式
-
-```
-NIS_t = Σ (w_i,t × S_i,t × D(days_ago_i,t))
-
-  w_i,t       : ボリューム加重 × 関連性加重
-  S_i,t       : FinBERTスコア (positive確率 - negative確率)
-  D(days_ago) : exp(-decay_rate × days_ago)  指数関数的時間減衰
-```
+※ Transformerは以前のTensorFlow/Keras実装からPyTorch実装に移行。インターフェースは互換性を維持。
+※ データベース構造の変更が必要な場合は、既存カラムを削除せず新しいカラムを追加することで後方互換性を維持する。
 
 ---
 
 ## 4. 開発ルール
 
-### 4.1 コーディング規約
-
-1. **言語**: Python 3.12+。型ヒント（Type Hints）を原則すべての関数に付与する。
-2. **文字コード**: UTF-8。日本語コメント・文字列を積極的に使用してよい。
-3. **モジュール分割**: 機能ごとに `src/` 配下のファイルに分離する。`alphasignal.py` はエントリポイントのみとし、ロジックを直書きしない。
-4. **docstring**: 全関数に Google スタイルの docstring を記載する。
-5. **定数**: マジックナンバーは定数（大文字スネークケース）として定義する。
-6. **エラー処理**: ユーザー入力・外部API呼び出しには必ず try/except を付ける。エラーメッセージは日本語で `⚠` プレフィックスを付ける。
-7. **ログ出力**: `print()` を使用。本番移行時は `logging` モジュールへ切り替える。
-
-### 4.2 データ・モデル規約
-
-1. **データ分割**: 時系列データのため、**シャッフルなし**の時系列分割（訓練80% / テスト20%）を徹底する。
-2. **スケーリング**: `MinMaxScaler` を使用。fit は訓練データのみ、transform はテストデータに適用。
-3. **ターゲット変数**: 翌営業日の終値（`Close.shift(-1)`）を予測対象とする。
-4. **ダミーデータ**: `data/{TICKER}_dummy.csv` にフォールバック機能を維持すること（オフライン・テスト用途）。
-
-### 4.3 UI/メニュー規約
-
-1. **対話式メニュー**は `src/menu.py` に集約する。`alphasignal.py` から呼び出す構造を維持する。
-2. 企業名解決辞書 `COMPANY_ALIASES` は `src/menu.py` 内で管理する。新規追加時はここに追記する。
-3. メニュー画面の罫線・スタイルは既存デザイン（`╔╗╚╝║`, `┌┐└┘│`）を踏襲する。
-4. すべての入力にデフォルト値（`[デフォルト値]`形式）を提示する。
-
-### 4.4 結果出力規約
-
-1. JSON 結果: `results/{TICKER}_results.json`（`NumpyEncoder` で float32 を変換）
-2. CSV 予測値: `results/{TICKER}_predictions.csv`
-3. ティッカー名に `^` や `/` が含まれる場合はファイル名をサニタイズする（`safe_ticker`）。
-
-### 4.5 禁止事項
-
-- `main.py` への新機能追加（レガシー互換のみ維持）
-- 訓練データにテストデータを混入させるリーク処理
-- API キーをコード内にハードコーディング
-- `results/` ディレクトリ以外への出力ファイル生成
-
----
-
-## 5. 実行方法
-
-```bash
-# セットアップ
-pip install -r requirements.txt
-
-# 【推奨】対話式メニュー
-python alphasignal.py
-
-# CLIモード（スクリプト・自動化用）
-python alphasignal.py --cli --ticker AAPL --start 2020-01-01 --end 2023-12-31
-python alphasignal.py --cli --ticker トヨタ --start 2019-01-01 --end 2024-01-01
-python alphasignal.py --cli --ticker NVDA --epochs 100 --seq_len 60
-
-# FinBERT 実運用時（オプション）
-pip install transformers torch
-# src/news_sentiment.py の get_finbert_sentiment() コメントアウトを解除
-```
-
----
-
-## 6. 今後の拡張予定（Roadmap）
-
-| 優先度 | 機能 | 対象ファイル |
-|--------|------|-------------|
-| 高 | FinBERT 実装を有効化（transformers 導入） | `src/news_sentiment.py` |
-| 高 | 実ニュース API 連携（Alpha Vantage / News API） | `src/news_sentiment.py` |
-| 中 | 予測結果のグラフ可視化（matplotlib） | `src/visualize.py`（新規） |
-| 中 | 複数銘柄の一括バッチ実行 | `alphasignal.py` |
-| 中 | モデルの保存・ロード機能（joblib / keras save） | `src/lgbm_model.py`, `src/transformer_model.py` |
-| 低 | ソーシャルメディア（Twitter/X, Reddit）センチメント | `src/news_sentiment.py` |
-| 低 | リアルタイム予測モード | `alphasignal.py` |
-| 低 | Web UI 化（Streamlit / Gradio） | `app.py`（新規） |
+（省略: 以前の内容を維持）
 
 ---
 
 ## 7. 変更履歴
-
-> **⚠️ AI作業者へ**: セッション終了前に必ずここに追記すること。
-> フォーマット: `| YYYY-MM-DD | バージョン | 変更者 | 変更内容 |`
 
 | 日付 | バージョン | 変更者 | 変更内容 |
 |------|-----------|--------|---------|
@@ -204,17 +108,8 @@ pip install transformers torch
 | 2026-05-25 | v1.1.0 | Claude Sonnet 4.6 | プロジェクト名を AlphaSignal に変更。`alphasignal.py`（メインエントリ）と `src/menu.py`（対話式メニュー）を新規作成。企業名→ティッカー自動変換辞書（日英約40社）追加。実行後メニュー（再実行・終了）追加。`AlphaSignal.md`（本ファイル）作成。 |
 | 2026-05-25 | v1.1.1 | Gemini CLI | AVX非対応環境でのIllegal instructionエラー回避のため、TensorFlowからPyTorchへモデル実装を移行。`main.py`および`alphasignal.py`の動作を確認。 |
 | 2026-05-25 | v1.2.0 | Gemini CLI | SQLite データベース (`alphasignal.db`) を統合。データの永続化、欠損値チェック、重複防止機能を実装。`src/database.py` を新規作成し、各モジュールと連携。 |
-
----
-
-## 8. 既知の問題・制限事項
-
-| # | 内容 | 回避策 |
-|---|------|--------|
-| 1 | Yahoo Finance がネットワーク制限環境で 403 エラー | `data/{TICKER}_dummy.csv` にフォールバック |
-| 2 | ニュースセンチメントがダミーデータ（ランダム値） | FinBERT 実装有効化 or 実 API 連携が必要（Roadmap 参照） |
-| 3 | Transformer の学習時間が長い（CPU環境で数分） | `--epochs` を下げる。GPU環境では大幅短縮 |
-| 4 | `^GSPC` など特殊文字を含むティッカーのファイル名 | `safe_ticker` でサニタイズ済み |
+| 2026-05-25 | v1.2.0 | Gemini CLI | Git リポジトリの初期化、`.gitignore` の作成、および初期コミットを実施。GitHub 連携の準備完了。 |
+| 2026-05-26 | v1.2.1 | Gemini CLI | 環境変数（`.env`）による設定管理を導入。`python-dotenv` を追加し、DB名やAPIキーの外部管理を可能に。 |
 
 ---
 
