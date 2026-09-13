@@ -110,6 +110,7 @@ stock_prediction_project/
 | 2026-05-25 | v1.2.0 | Gemini CLI | SQLite データベース (`alphasignal.db`) を統合。データの永続化、欠損値チェック、重複防止機能を実装。`src/database.py` を新規作成し、各モジュールと連携。 |
 | 2026-05-25 | v1.2.0 | Gemini CLI | Git リポジトリの初期化、`.gitignore` の作成、および初期コミットを実施。GitHub 連携の準備完了。 |
 | 2026-05-26 | v1.2.1 | Gemini CLI | 環境変数（`.env`）による設定管理を導入。`python-dotenv` を追加し、DB名やAPIキーの外部管理を可能に。 |
+| 2026-05-26 | v1.3.0 | Jules | `AlphaEngineConfig` および `AlphaEngine` クラスを新規追加 (`src/alpha_engine.py`)。過去リターン行列からのRidge正則化重み算出（L1正規化）とシグナル結合機能を実装。 |
 
 ---
 
