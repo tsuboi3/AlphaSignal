@@ -31,35 +31,49 @@ class AlphaEngine:
         if returns_matrix.empty or returns_matrix.shape[1] == 0:
             raise ValueError("returns_matrix is empty or has no columns.")
 
+        m_rows, n_cols = returns_matrix.shape
+        if m_rows <= self.config.d:
+            raise ValueError(f"Input data row count M ({m_rows}) must be strictly greater than config.d ({self.config.d}).")
+
+        # 欠損値・Inf処理: ffill 後、残存分を列平均値で補完
+        returns_cleaned = returns_matrix.replace([np.inf, -np.inf], np.nan)
+        returns_cleaned = returns_cleaned.ffill()
+        returns_cleaned = returns_cleaned.fillna(returns_cleaned.mean()).fillna(0.0)
+
         # 直近 d 期間のデータを使用して期待リターン mu と共分散行列 sigma を計算
-        recent_returns = returns_matrix.tail(self.config.d)
-        if len(recent_returns) == 0:
-            recent_returns = returns_matrix
+        recent_returns = returns_cleaned.tail(self.config.d)
 
         mu = recent_returns.mean().values  # (N,)
         cov = recent_returns.cov().values  # (N, N)
 
         # 欠損値やデータ数不足で cov に NaN が含まれる場合は単位行列に補正
         if np.isnan(cov).any() or cov.size == 0:
-            cov = np.eye(returns_matrix.shape[1])
+            cov = np.eye(n_cols)
         if np.isnan(mu).any():
-            mu = np.zeros(returns_matrix.shape[1])
+            mu = np.zeros(n_cols)
 
-        # Ridge正則化: Sigma_reg = Sigma + l2_reg * I
-        n = returns_matrix.shape[1]
-        cov_reg = cov + self.config.l2_reg * np.eye(n)
-
-        # 最適ウェイト w = Sigma_reg^-1 * mu
+        # 数値的安定性: lstsq をデフォルトとし、条件数が悪い（特異行列に近い）場合は正則化解法へフォールバック
+        use_fallback = False
         try:
-            raw_weights = np.linalg.solve(cov_reg, mu)
+            cond = np.linalg.cond(cov)
+            if np.isinf(cond) or cond > 1e12:
+                use_fallback = True
+            else:
+                raw_weights, _, _, _ = np.linalg.lstsq(cov, mu, rcond=None)
         except np.linalg.LinAlgError:
-            raw_weights = np.linalg.pinv(cov_reg) @ mu
+            use_fallback = True
 
-        # L1ノルム規格化: |w| の和で割る
+        if use_fallback:
+            cov_reg = cov + self.config.l2_reg * np.eye(n_cols)
+            try:
+                raw_weights = np.linalg.solve(cov_reg, mu)
+            except np.linalg.LinAlgError:
+                raw_weights = np.linalg.pinv(cov_reg) @ mu
+
+        # フェイルセーフ: sum(|w_raw|) < 10^-12 の場合は等加重 (w(i) = 1/N)
         l1_norm = np.sum(np.abs(raw_weights))
-        if l1_norm < self.config.eps_clip:
-            # すべての要素がほぼ0の場合、均等ウェイト
-            weights = np.ones(n) / n
+        if l1_norm < 1e-12:
+            weights = np.ones(n_cols) / n_cols
         else:
             weights = raw_weights / l1_norm
 
