@@ -43,6 +43,13 @@ COMPANY_ALIASES: Dict[str, str] = {
     "楽天": "4755.T", "rakuten": "4755.T",
 }
 
+# 日本株注目100銘柄のエイリアスを動的マージ
+try:
+    from src.japan_stocks import generate_japan_stock_aliases, interactive_select_japan_stock
+    COMPANY_ALIASES.update(generate_japan_stock_aliases())
+except Exception:
+    pass
+
 # プリセット期間
 PERIOD_PRESETS = [
     ("1年", "-1y"),
@@ -129,14 +136,15 @@ def display_main_menu() -> str:
     print("  │  3 │ 残差アルファ抽出 & 合成 (AlphaCombiner)          │")
     print("  │  4 │ 総合トレード診断・売買判定 (Trade Signal Alert)  │")
     print("  │  5 │ データベース状態確認 & 統計表示                  │")
-    print("  │  6 │ 終了                                            │")
+    print("  │  6 │ 日本株注目100銘柄リスト閲覧 & 検索               │")
+    print("  │  7 │ 終了                                            │")
     print("  └────┴─────────────────────────────────────────────────┘")
     print()
     while True:
         choice = input_with_prompt("番号を選択", "1")
-        if choice in ("1", "2", "3", "4", "5", "6"):
+        if choice in ("1", "2", "3", "4", "5", "6", "7"):
             return choice
-        print("  ⚠  1〜6 の番号を入力してください。\n")
+        print("  ⚠  1〜7 の番号を入力してください。\n")
 
 
 def menu_select_company() -> str:
@@ -144,13 +152,21 @@ def menu_select_company() -> str:
     print_separator("銘柄の選択")
     print()
     print("  企業名（日本語可）またはティッカーシンボルを入力してください。")
-    print("  例: apple / アップル / AAPL | トヨタ / 7203.T | nvidia / NVDA")
+    print("  💡 'L' を入力すると日本株キャピタルゲイン注目100銘柄から選択できます。")
+    print("  例: apple / アップル | トヨタ / 7203 | 東京エレクトロン / 8035")
     print()
 
     while True:
-        raw = input_with_prompt("企業名 または ティッカーシンボル", "AAPL")
+        raw = input_with_prompt("企業名 または ティッカーシンボル ('L'で100銘柄セレクター)", "AAPL")
         if not raw:
             print("  ⚠  入力が空です。もう一度入力してください。\n")
+            continue
+
+        if raw.lower() in ("l", "list", "100", "銘柄一覧"):
+            selected_ticker = interactive_select_japan_stock()
+            if selected_ticker:
+                return selected_ticker
+            print("  通常の銘柄入力に戻ります。\n")
             continue
 
         ticker = resolve_ticker(raw)

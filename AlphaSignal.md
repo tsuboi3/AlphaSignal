@@ -12,8 +12,8 @@
 | 項目 | 内容 |
 |------|------|
 | **プロジェクト名** | AlphaSignal |
-| **バージョン** | v1.2.0 |
-| **最終更新** | 2026-05-25 |
+| **バージョン** | v1.6.0 |
+| **最終更新** | 2026-09-14 |
 | **目的** | LightGBM + Transformer + ニュースセンチメント分析を組み合わせた株価予測システム |
 | **主要言語** | Python 3.12+ (PyTorch版) |
 | **メインエントリ** | `alphasignal.py` |
@@ -34,7 +34,7 @@
 stock_prediction_project/
 │
 ├── alphasignal.py              # 【メインエントリ】対話式メニュー + 予測パイプライン
-├── main.py                     # レガシー CLI（互換性維持のため残存）
+├── main.py                     # 全体統合メイン実行スクリプト
 ├── AlphaSignal.md              # 【本ファイル】プロジェクト管理・AI引き継ぎ文書
 ├── README.md                   # ユーザー向けセットアップ・使い方ガイド
 ├── requirements.txt            # pip 依存ライブラリ一覧
@@ -45,15 +45,18 @@ stock_prediction_project/
 │   ├── __init__.py
 │   ├── database.py             # SQLite データベース管理（永続化・重複排除・Drive同期連携）
 │   ├── drive_sync.py           # Google Drive 同期管理（自動アップロード/ダウンロード）
+│   ├── japan_stocks.py         # 日本株注目100銘柄管理・セクター分類・エイリアス生成・選択UI
 │   ├── menu.py                 # 対話式メニューUI（企業名解決・期間選択）
 │   ├── features.py             # 特徴量エンジニアリング（DB連携・前処理）
 │   ├── news_sentiment.py       # ニュースセンチメント取得・NIS計算（DB連携）
 │   ├── lgbm_model.py           # LightGBM モデル定義・学習
 │   ├── transformer_model.py    # Transformer モデル定義・学習（PyTorch）
+│   ├── alpha_engine.py         # アルファ結合・シグナル重み最適化
 │   └── ensemble.py             # スタッキングアンサンブル・評価・バックテスト
 │
 ├── data/
-│   └── {TICKER}_dummy.csv      # オフライン用ダミー株価データ（テスト用）
+│   ├── japan_stocks_100.json   # 日本株キャピタルゲイン注目100銘柄（JSON形式マスター）
+│   └── japan_stocks_100.csv    # 日本株キャピタルゲイン注目100銘柄（CSV形式マスター）
 │
 └── results/
     ├── {TICKER}_results.json   # 評価指標サマリー（JSON）
@@ -114,6 +117,7 @@ stock_prediction_project/
 | 2026-05-26 | v1.3.0 | Jules | `AlphaEngineConfig` および `AlphaEngine` クラスを新規追加 (`src/alpha_engine.py`)。過去リターン行列からのRidge正則化重み算出（L1正規化）とシグナル結合機能を実装。 |
 | 2026-05-26 | v1.4.0 | Jules | システム全体統合設計書 `計画書.md` を作成。`main.py` および `src/menu.py` を再構築し、株価予測、AlphaEngine、AlphaCombiner、総合トレード診断 (Buy/Sell/Hold)、DB確認を提供する対話型CUIメニューを構築。 |
 | 2026-09-14 | v1.5.0 | Gemini CLI | Google Drive 同期連携を実装。`alphasignal.db` を指定のGoogle Drive共有フォルダへ設置。`src/drive_sync.py` を新規作成し、起動時の自動プル（ダウンロード）およびデータ保存時の自動プッシュ（更新）機能を統合。メニューのDB確認画面にもDrive同期ステータス表示を追加。 |
+| 2026-09-14 | v1.6.0 | Gemini CLI | Googleスプレッドシート（japan_stocks_capital_gain_100）から日本株キャピタルゲイン注目100銘柄をインポート（data/japan_stocks_100.json, csv）。セクター別ブラウズ・銘柄検索・エイリアス自動解決を提供する src/japan_stocks.py を実装し、メインメニューおよび銘柄選択UIに統合。ユニットテスト追加（全38件通過）。 |
 
 ---
 

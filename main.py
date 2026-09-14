@@ -42,6 +42,7 @@ from src.menu import (
     run_interactive_menu, menu_post_run, print_header, print_separator,
     SEPARATOR, input_with_prompt, resolve_ticker
 )
+from src.japan_stocks import interactive_select_japan_stock
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -448,6 +449,18 @@ def main():
             run_db_inspection()
             input("\n  Enterキーを押してメインメニューに戻ります...")
         elif choice == "6":
+            selected_ticker = interactive_select_japan_stock()
+            if selected_ticker:
+                print(f"  選択された銘柄: {selected_ticker}")
+                print("  [1] 株価予測・バックテストを実行")
+                print("  [2] メインメニューに戻る")
+                action = input_with_prompt("番号を選択", "1")
+                if action == "1":
+                    start, end = menu_select_period()
+                    run_prediction(selected_ticker, start, end, seq_len=30, epochs=30, save_dir='results')
+                    menu_post_run(selected_ticker, 'results')
+            input("\n  Enterキーを押してメインメニューに戻ります...")
+        elif choice == "7":
             print("\n  AlphaSignal を終了します。\n")
             break
 
