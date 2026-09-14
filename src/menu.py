@@ -1,13 +1,13 @@
 """
 AlphaSignal - 対話式メニューモジュール
-企業名・ティッカー・期間・詳細設定をインタラクティブに入力する
+企業名・ティッカー・期間・アルファ合成・シグナル診断・DB確認メニューの処理を提供する
 """
 
 import os
 import sys
 import re
 from datetime import datetime, date
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 # ──────────────────────────────────────────────
@@ -62,16 +62,16 @@ def clear_screen():
 def print_header():
     print()
     print("╔══════════════════════════════════════════════════════════╗")
-    print("║          AlphaSignal  株価予測システム  v1.0             ║")
-    print("║   LightGBM + Transformer + ニュースセンチメント          ║")
+    print("║          AlphaSignal  株価予測システム  v1.3             ║")
+    print("║   LightGBM + Transformer + NIS + AlphaCombiner           ║")
     print("╚══════════════════════════════════════════════════════════╝")
     print()
 
 
 def print_separator(title: str = ""):
     if title:
-        pad = (62 - len(title) - 2) // 2
-        print(f"{'─' * pad} {title} {'─' * (62 - pad - len(title) - 2)}")
+        pad = max(1, (62 - len(title) - 2) // 2)
+        print(f"{'─' * pad} {title} {'─' * max(1, (62 - pad - len(title) - 2))}")
     else:
         print(SEPARATOR)
 
@@ -86,18 +86,15 @@ def input_with_prompt(prompt: str, default: str = "") -> str:
         return val
 
 
-def resolve_ticker(user_input: str) -> Optional[str]:
+def resolve_ticker(user_input: str) -> str:
     """
     企業名・ティッカーシンボルを正規化して返す。
     例: 'apple' → 'AAPL', 'トヨタ' → '7203.T', 'AAPL' → 'AAPL'
     """
     normalized = user_input.strip().lower()
-    # 辞書引き
     if normalized in COMPANY_ALIASES:
         return COMPANY_ALIASES[normalized]
-    # そのままティッカーとして使う（大文字化）
-    ticker = user_input.strip().upper()
-    return ticker
+    return user_input.strip().upper()
 
 
 def validate_date(date_str: str) -> bool:
@@ -121,34 +118,47 @@ def calc_date_from_preset(preset: str):
     return None, None
 
 
+def display_main_menu() -> str:
+    """メイン機能選択画面"""
+    print_header()
+    print("  【メインメニュー】実行するモードを選択してください:")
+    print()
+    print("  ┌────┬─────────────────────────────────────────────────┐")
+    print("  │  1 │ 統合株価予測 & バックテスト (LightGBM+Trans+NIS) │")
+    print("  │  2 │ アルファ結合・シグナルウェイト算定 (AlphaEngine) │")
+    print("  │  3 │ 残差アルファ抽出 & 合成 (AlphaCombiner)          │")
+    print("  │  4 │ 総合トレード診断・売買判定 (Trade Signal Alert)  │")
+    print("  │  5 │ データベース状態確認 & 統計表示                  │")
+    print("  │  6 │ 終了                                            │")
+    print("  └────┴─────────────────────────────────────────────────┘")
+    print()
+    while True:
+        choice = input_with_prompt("番号を選択", "1")
+        if choice in ("1", "2", "3", "4", "5", "6"):
+            return choice
+        print("  ⚠  1〜6 の番号を入力してください。\n")
+
+
 def menu_select_company() -> str:
     """企業・ティッカー選択画面"""
-    print_separator("STEP 1 / 4  ─  銘柄を選択")
+    print_separator("銘柄の選択")
     print()
     print("  企業名（日本語可）またはティッカーシンボルを入力してください。")
-    print()
-    print("  例: apple  /  アップル  /  AAPL")
-    print("      トヨタ  /  toyota  /  7203.T")
-    print("      nvidia  /  エヌビディア  /  NVDA")
-    print()
-    print("  ヒント: 企業名で入力するとティッカーに自動変換されます。")
+    print("  例: apple / アップル / AAPL | トヨタ / 7203.T | nvidia / NVDA")
     print()
 
     while True:
-        raw = input_with_prompt("企業名 または ティッカーシンボル")
+        raw = input_with_prompt("企業名 または ティッカーシンボル", "AAPL")
         if not raw:
             print("  ⚠  入力が空です。もう一度入力してください。\n")
             continue
 
         ticker = resolve_ticker(raw)
-        alias_msg = ""
         if raw.lower() in COMPANY_ALIASES:
-            alias_msg = f"  ✓ '{raw}' → ティッカー: {ticker}\n"
+            print(f"  ✓ '{raw}' → ティッカー: {ticker}")
         else:
-            alias_msg = f"  ✓ ティッカー: {ticker}\n"
+            print(f"  ✓ ティッカー: {ticker}")
 
-        print()
-        print(alias_msg)
         confirm = input("  この銘柄で進みますか？ [Y/n]: ").strip().lower()
         if confirm in ("", "y", "yes", "はい"):
             return ticker
@@ -157,7 +167,7 @@ def menu_select_company() -> str:
 
 def menu_select_period() -> tuple:
     """期間選択画面"""
-    print_separator("STEP 2 / 4  ─  分析期間を選択")
+    print_separator("分析期間の選択")
     print()
     print("  ┌────┬──────────────────────────┐")
     for i, (label, _) in enumerate(PERIOD_PRESETS, 1):
@@ -166,7 +176,7 @@ def menu_select_period() -> tuple:
     print()
 
     while True:
-        raw = input_with_prompt("番号を選択", "3")
+        raw = input_with_prompt("番号を選択", "2")
         try:
             idx = int(raw) - 1
             if not (0 <= idx < len(PERIOD_PRESETS)):
@@ -198,7 +208,6 @@ def menu_select_period() -> tuple:
 
         print()
         print(f"  ✓ 期間: {start}  ～  {end}  （{label}）")
-        print()
         confirm = input("  この期間で進みますか？ [Y/n]: ").strip().lower()
         if confirm in ("", "y", "yes", "はい"):
             return start, end
@@ -207,17 +216,13 @@ def menu_select_period() -> tuple:
 
 def menu_advanced_settings(defaults: Dict[str, Any]) -> Dict[str, Any]:
     """詳細設定画面（オプション）"""
-    print_separator("STEP 3 / 4  ─  詳細設定（任意）")
-    print()
-    print("  Enterキーを押すとデフォルト値が使用されます。")
+    print_separator("詳細設定")
     print()
 
     settings = dict(defaults)
 
-    # シーケンス長
     while True:
-        raw = input_with_prompt("Transformer シーケンス長（推奨: 20〜60）",
-                                str(settings['seq_len']))
+        raw = input_with_prompt("Transformer シーケンス長（推奨: 20〜60）", str(settings['seq_len']))
         try:
             v = int(raw)
             if 5 <= v <= 120:
@@ -227,10 +232,8 @@ def menu_advanced_settings(defaults: Dict[str, Any]) -> Dict[str, Any]:
         except ValueError:
             print("  ⚠  整数を入力してください。\n")
 
-    # エポック数
     while True:
-        raw = input_with_prompt("Transformer 学習エポック数（推奨: 30〜100）",
-                                str(settings['epochs']))
+        raw = input_with_prompt("Transformer 学習エポック数（推奨: 30〜100）", str(settings['epochs']))
         try:
             v = int(raw)
             if 5 <= v <= 500:
@@ -240,18 +243,15 @@ def menu_advanced_settings(defaults: Dict[str, Any]) -> Dict[str, Any]:
         except ValueError:
             print("  ⚠  整数を入力してください。\n")
 
-    # 結果保存先
     raw = input_with_prompt("結果保存ディレクトリ", settings['save_dir'])
     settings['save_dir'] = raw if raw else settings['save_dir']
 
-    print()
     return settings
 
 
-def menu_confirm(ticker: str, start: str, end: str,
-                 settings: Dict[str, Any]) -> bool:
+def menu_confirm(ticker: str, start: str, end: str, settings: Dict[str, Any]) -> bool:
     """実行前確認画面"""
-    print_separator("STEP 4 / 4  ─  実行確認")
+    print_separator("実行確認")
     print()
     print("  ┌─────────────────────────────────────────────────────┐")
     print(f"  │  銘柄         : {ticker:<38}│")
@@ -261,17 +261,17 @@ def menu_confirm(ticker: str, start: str, end: str,
     print(f"  │  保存先       : {settings['save_dir']:<38}│")
     print("  └─────────────────────────────────────────────────────┘")
     print()
-    ans = input("  上記の設定で予測を開始しますか？ [Y/n]: ").strip().lower()
+    ans = input("  上記の設定で処理を開始しますか？ [Y/n]: ").strip().lower()
     return ans in ("", "y", "yes", "はい")
 
 
 def menu_post_run(ticker: str, save_dir: str) -> str:
     """実行後メニュー"""
     print()
-    print_separator("実行後メニュー")
+    print_separator("実行完了 - 次のアクション")
     print()
     print("  ┌────┬──────────────────────────────┐")
-    print("  │  1 │  別の銘柄・期間で再実行      │")
+    print("  │  1 │  メインメニューに戻る        │")
     print("  │  2 │  同じ設定で再実行            │")
     print("  │  3 │  終了                        │")
     print("  └────┴──────────────────────────────┘")
@@ -285,65 +285,41 @@ def menu_post_run(ticker: str, save_dir: str) -> str:
 
 def run_interactive_menu() -> Optional[Dict[str, Any]]:
     """
-    フルインタラクティブメニューを実行し、設定辞書を返す。
-    ユーザーがキャンセルした場合は None を返す。
+    株価予測用のインターフェース設定取得
     """
-    clear_screen()
-    print_header()
-
     defaults = {
         'seq_len': 30,
         'epochs': 50,
         'save_dir': 'results',
     }
 
-    while True:
-        try:
-            # STEP 1: 銘柄
-            print()
-            ticker = menu_select_company()
-            print()
+    try:
+        ticker = menu_select_company()
+        print()
 
-            # STEP 2: 期間
-            start, end = menu_select_period()
-            print()
+        start, end = menu_select_period()
+        print()
 
-            # STEP 3: 詳細設定
-            use_adv = input(
-                "  詳細設定を変更しますか？（デフォルトで問題なければ N） [y/N]: "
-            ).strip().lower()
-            print()
-            if use_adv in ("y", "yes", "はい"):
-                settings = menu_advanced_settings(defaults)
-            else:
-                settings = dict(defaults)
-                print(f"  ✓ デフォルト設定を使用します。")
-                print(f"    シーケンス長={settings['seq_len']}  "
-                      f"エポック={settings['epochs']}  "
-                      f"保存先={settings['save_dir']}")
-            print()
+        use_adv = input("  詳細設定を変更しますか？ [y/N]: ").strip().lower()
+        print()
+        if use_adv in ("y", "yes", "はい"):
+            settings = menu_advanced_settings(defaults)
+        else:
+            settings = dict(defaults)
+        print()
 
-            # STEP 4: 確認
-            if not menu_confirm(ticker, start, end, settings):
-                print()
-                retry = input("  最初からやり直しますか？ [Y/n]: ").strip().lower()
-                if retry not in ("", "y", "yes", "はい"):
-                    print("\n  AlphaSignal を終了します。\n")
-                    return None
-                clear_screen()
-                print_header()
-                continue
-
-            # 設定を返す
-            return {
-                'ticker':   ticker,
-                'start':    start,
-                'end':      end,
-                'seq_len':  settings['seq_len'],
-                'epochs':   settings['epochs'],
-                'save_dir': settings['save_dir'],
-            }
-
-        except KeyboardInterrupt:
-            print("\n\n  AlphaSignal を終了します。\n")
+        if not menu_confirm(ticker, start, end, settings):
             return None
+
+        return {
+            'ticker':   ticker,
+            'start':    start,
+            'end':      end,
+            'seq_len':  settings['seq_len'],
+            'epochs':   settings['epochs'],
+            'save_dir': settings['save_dir'],
+        }
+
+    except KeyboardInterrupt:
+        print("\n\n  操作がキャンセルされました。\n")
+        return None

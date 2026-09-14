@@ -111,6 +111,7 @@ stock_prediction_project/
 | 2026-05-25 | v1.2.0 | Gemini CLI | Git リポジトリの初期化、`.gitignore` の作成、および初期コミットを実施。GitHub 連携の準備完了。 |
 | 2026-05-26 | v1.2.1 | Gemini CLI | 環境変数（`.env`）による設定管理を導入。`python-dotenv` を追加し、DB名やAPIキーの外部管理を可能に。 |
 | 2026-05-26 | v1.3.0 | Jules | `AlphaEngineConfig` および `AlphaEngine` クラスを新規追加 (`src/alpha_engine.py`)。過去リターン行列からのRidge正則化重み算出（L1正規化）とシグナル結合機能を実装。 |
+| 2026-05-26 | v1.4.0 | Jules | システム全体統合設計書 `計画書.md` を作成。`main.py` および `src/menu.py` を再構築し、株価予測、AlphaEngine、AlphaCombiner、総合トレード診断 (Buy/Sell/Hold)、DB確認を提供する対話型CUIメニューを構築。 |
 
 ---
 
