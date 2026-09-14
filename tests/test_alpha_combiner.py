@@ -6,6 +6,81 @@ from src.signals.alpha_combiner import AlphaCombiner
 from src.signals.factor_orthogonalizer import FactorOrthogonalizer
 
 
+def test_l1_norm_constraint():
+    r"""
+    テスト1: L1ノルム制約検証
+    任意のランダムリターン行列に対し、出力ウェイトの絶対値和 \sum |w(i)| が許容誤差 10^-6 以内で 1.0 に収束すること。
+    """
+    np.random.seed(42)
+    M, N = 30, 5
+    R = np.random.randn(M, N)
+    combiner = AlphaCombiner()
+    res = combiner.compute_pipeline(R)
+
+    weights = res["weights"]
+    l1_norm = np.sum(np.abs(weights))
+    assert pytest.approx(l1_norm, abs=1e-6) == 1.0
+
+
+def test_market_common_factor_removal():
+    """
+    テスト2: 市場共通ファクター除去の検証
+    全銘柄に同一の共通トレンド（+2% ドリフト）を付与した場合でも、
+    式（5）のクロスセクショナル平均除去により共通項が完全にゼロへ相殺されること。
+    """
+    np.random.seed(42)
+    M, N = 20, 6
+    # 基本のランダムリターン
+    base_returns = np.random.randn(M, N)
+    # 全銘柄に同一の共通トレンド（+2% ドリフト）を付与
+    common_trend = 0.02
+    R = base_returns + common_trend
+
+    combiner = AlphaCombiner()
+    res = combiner.compute_pipeline(R)
+
+    Lambda = res["factor_matrix"]  # N x (M-1)
+    # 各タイムステップにおける銘柄間の平均（クロスセクショナル平均）がゼロであることを確認
+    np.testing.assert_allclose(np.mean(Lambda, axis=0), 0.0, atol=1e-12)
+
+
+def test_input_dimension_exception():
+    """
+    テスト3: 入力次元・例外検証
+    M < d の場合に適切なエラーが送出されること。
+    """
+    np.random.seed(42)
+    M, N = 5, 10  # M = 5
+    d = 10        # d = 10 > M
+    R = np.random.randn(M, N)
+
+    combiner = AlphaCombiner()
+    with pytest.raises(ValueError):
+        combiner.compute_pipeline(R, d=d)
+
+
+def test_constant_signal_fault_tolerance():
+    """
+    テスト4: 定数シグナルの耐障害性
+    ボラティリティがゼロのシグナルが含まれていた場合でも、ゼロ除算エラーにならず安全に処理されること。
+    """
+    M, N = 20, 4
+    np.random.seed(42)
+    R = np.random.randn(M, N)
+    # 0番目のシグナルを定数（ボラティリティゼロ）にする
+    R[:, 0] = 0.05
+
+    combiner = AlphaCombiner()
+    # ゼロ除算エラーや例外が発生せず正常にパイプラインが完了すること
+    res = combiner.compute_pipeline(R)
+
+    weights = res["weights"]
+    assert not np.isnan(weights).any()
+    assert not np.isinf(weights).any()
+    # L1ノルム制約も満たされること
+    assert pytest.approx(np.sum(np.abs(weights)), abs=1e-6) == 1.0
+
+
 def test_drift_removal_and_volatility():
     np.random.seed(42)
     M, N = 20, 4
