@@ -71,3 +71,56 @@ def test_empty_returns_matrix():
     engine = AlphaEngine()
     with pytest.raises(ValueError):
         engine.fit_weights(pd.DataFrame())
+
+
+def test_row_count_less_than_or_equal_to_d():
+    engine = AlphaEngine(config=AlphaEngineConfig(d=5))
+    dates = pd.date_range("2023-01-01", periods=5)
+    df = pd.DataFrame(np.random.randn(5, 2), index=dates, columns=["sig1", "sig2"])
+    with pytest.raises(ValueError, match="Input data row count M"):
+        engine.fit_weights(df)
+
+
+def test_nan_inf_imputation():
+    engine = AlphaEngine(config=AlphaEngineConfig(d=3))
+    dates = pd.date_range("2023-01-01", periods=6)
+    # Put NaN and Inf values
+    data = [
+        [np.nan, 0.01],
+        [0.02, np.inf],
+        [np.nan, -np.inf],
+        [0.03, 0.04],
+        [0.01, np.nan],
+        [0.02, 0.05],
+    ]
+    df = pd.DataFrame(data, index=dates, columns=["sig1", "sig2"])
+    weights = engine.fit_weights(df)
+    assert isinstance(weights, pd.Series)
+    assert not weights.isna().any()
+    assert pytest.approx(weights.abs().sum(), abs=1e-6) == 1.0
+
+
+def test_ill_conditioned_cov_fallback():
+    engine = AlphaEngine(config=AlphaEngineConfig(d=5))
+    dates = pd.date_range("2023-01-01", periods=10)
+    # Create collinear columns (singular/ill-conditioned matrix)
+    base = np.random.randn(10, 1)
+    data = np.hstack([base, base, base * 2])
+    df = pd.DataFrame(data, index=dates, columns=["sig1", "sig2", "sig3"])
+
+    weights = engine.fit_weights(df)
+    assert isinstance(weights, pd.Series)
+    assert not weights.isna().any()
+    assert pytest.approx(weights.abs().sum(), abs=1e-6) == 1.0
+
+
+def test_failsafe_zero_raw_weights():
+    engine = AlphaEngine(config=AlphaEngineConfig(d=5))
+    dates = pd.date_range("2023-01-01", periods=10)
+    # Zero returns matrix -> mu is zeros -> raw weights zeros -> sum |w_raw| < 1e-12
+    df = pd.DataFrame(np.zeros((10, 3)), index=dates, columns=["sig1", "sig2", "sig3"])
+
+    weights = engine.fit_weights(df)
+    assert isinstance(weights, pd.Series)
+    # Equal weights 1/N = 1/3
+    np.testing.assert_allclose(weights.values, np.array([1 / 3, 1 / 3, 1 / 3]))
