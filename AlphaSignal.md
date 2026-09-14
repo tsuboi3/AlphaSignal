@@ -43,7 +43,8 @@ stock_prediction_project/
 │
 ├── src/
 │   ├── __init__.py
-│   ├── database.py             # SQLite データベース管理（永続化・重複排除）
+│   ├── database.py             # SQLite データベース管理（永続化・重複排除・Drive同期連携）
+│   ├── drive_sync.py           # Google Drive 同期管理（自動アップロード/ダウンロード）
 │   ├── menu.py                 # 対話式メニューUI（企業名解決・期間選択）
 │   ├── features.py             # 特徴量エンジニアリング（DB連携・前処理）
 │   ├── news_sentiment.py       # ニュースセンチメント取得・NIS計算（DB連携）
@@ -112,6 +113,7 @@ stock_prediction_project/
 | 2026-05-26 | v1.2.1 | Gemini CLI | 環境変数（`.env`）による設定管理を導入。`python-dotenv` を追加し、DB名やAPIキーの外部管理を可能に。 |
 | 2026-05-26 | v1.3.0 | Jules | `AlphaEngineConfig` および `AlphaEngine` クラスを新規追加 (`src/alpha_engine.py`)。過去リターン行列からのRidge正則化重み算出（L1正規化）とシグナル結合機能を実装。 |
 | 2026-05-26 | v1.4.0 | Jules | システム全体統合設計書 `計画書.md` を作成。`main.py` および `src/menu.py` を再構築し、株価予測、AlphaEngine、AlphaCombiner、総合トレード診断 (Buy/Sell/Hold)、DB確認を提供する対話型CUIメニューを構築。 |
+| 2026-09-14 | v1.5.0 | Gemini CLI | Google Drive 同期連携を実装。`alphasignal.db` を指定のGoogle Drive共有フォルダへ設置。`src/drive_sync.py` を新規作成し、起動時の自動プル（ダウンロード）およびデータ保存時の自動プッシュ（更新）機能を統合。メニューのDB確認画面にもDrive同期ステータス表示を追加。 |
 
 ---
 

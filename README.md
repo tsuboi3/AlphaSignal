@@ -10,15 +10,35 @@
 ```
 stock_prediction_project/
 ├── main.py                    # メイン実行スクリプト
+├── alphasignal.py             # 対話式メニュー・エントリ
 ├── requirements.txt           # 依存ライブラリ
+├── alphasignal.db             # SQLiteデータベース（Google Driveと自動同期）
+├── .env                       # 環境設定
 ├── src/
+│   ├── database.py            # SQLite DB 管理 & Google Drive 同期連携
+│   ├── drive_sync.py          # Google Drive 同期マネージャー
+│   ├── menu.py                # 対話式CUIメニュー
 │   ├── features.py            # 特徴量エンジニアリング（テクニカル指標など）
 │   ├── news_sentiment.py      # ニュースセンチメント分析・NIS計算
 │   ├── lgbm_model.py          # LightGBMモデル
-│   ├── transformer_model.py   # Transformerモデル（Keras）
+│   ├── transformer_model.py   # Transformerモデル（PyTorch）
 │   └── ensemble.py            # スタッキングアンサンブル・評価
 └── results/                   # 出力（JSONサマリー・CSVファイル）
 ```
+
+## Google Drive データベース同期
+
+`alphasignal.db` は指定の Google Drive 共有フォルダと自動連携しています。
+- **共有フォルダ**: `https://drive.google.com/drive/folders/1nDozKuBzTzUk0GKQcD9xAXqAofLIkVcq`
+- **起動時**: Google Drive 上から最新の DB をダウンロード（プル）
+- **データ更新時**: 株価やニュース指数の保存時に Google Drive へ自動アップロード（プッシュ）
+- **設定 (`.env`)**:
+  ```env
+  GOOGLE_DRIVE_SYNC=true
+  GOOGLE_DRIVE_FOLDER_ID=1nDozKuBzTzUk0GKQcD9xAXqAofLIkVcq
+  GOOGLE_DRIVE_QUOTA_PROJECT=kabutanproject
+  ```
+
 
 ## セットアップ
 

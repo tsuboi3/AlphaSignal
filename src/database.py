@@ -1,6 +1,6 @@
 """
 データベース管理モジュール
-SQLiteを使用したデータの永続化、欠損値チェック、重複防止。
+SQLiteを使用したデータの永続化、欠損値チェック、重複防止、Google Driveとの自動同期。
 """
 
 import sqlite3
@@ -8,16 +8,34 @@ import os
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
+
+from src.drive_sync import GoogleDriveSync
 
 # モジュールレベルでの環境変数読み込み（独立実行用）
 load_dotenv()
 
+
 class DatabaseManager:
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, sync_drive: Optional[bool] = None):
         # 環境変数 DB_NAME があれば優先、なければ引数、それもなければデフォルト
-        self.db_path = db_path or os.getenv("DB_NAME", "alphasignal.db")
+        default_db = os.getenv("DB_NAME", "alphasignal.db")
+        self.db_path = db_path or default_db
+
+        # Google Drive 同期の設定
+        # 指定がなければ、デフォルトDB (alphasignal.db) の場合のみ同期有効
+        if sync_drive is not None:
+            self.sync_drive_enabled = sync_drive
+        else:
+            self.sync_drive_enabled = (os.path.basename(self.db_path) == os.path.basename(default_db))
+
+        self.drive_sync = GoogleDriveSync(enabled=self.sync_drive_enabled)
+
+        # 起動時に Google Drive 上に最新データがあれば同期（ダウンロード）
+        if self.sync_drive_enabled:
+            self.sync_from_drive()
+
         self._init_db()
 
     def _get_connection(self):
@@ -53,8 +71,24 @@ class DatabaseManager:
             """)
             conn.commit()
 
+    def sync_from_drive(self, force: bool = False) -> bool:
+        """Google Drive から最新のDBを取得（ダウンロード）"""
+        if not self.sync_drive_enabled:
+            return False
+        return self.drive_sync.pull(self.db_path, force=force)
+
+    def sync_to_drive(self) -> bool:
+        """ローカルのDBを Google Drive へ反映（アップロード・更新）"""
+        if not self.sync_drive_enabled:
+            return False
+        return self.drive_sync.push(self.db_path)
+
+    def get_sync_status(self) -> Dict[str, Any]:
+        """Google Drive 同期ステータスを取得"""
+        return self.drive_sync.get_sync_status(self.db_path)
+
     def save_stocks(self, ticker: str, df: pd.DataFrame):
-        """株価データを保存（重複排除、欠損確認）"""
+        """株価データを保存（重複排除、欠損確認、Google Drive自動更新）"""
         if df.empty:
             return
 
@@ -79,8 +113,12 @@ class DatabaseManager:
             save_df.to_sql('stocks', conn, if_exists='append', index=False, method=self._insert_or_replace)
             conn.commit()
 
+        # Google Drive への自動更新
+        if self.sync_drive_enabled:
+            self.sync_to_drive()
+
     def save_news_impact(self, ticker: str, df: pd.DataFrame):
-        """ニュースインパクト指数を保存"""
+        """ニュースインパクト指数を保存（Google Drive自動更新）"""
         if df.empty:
             return
 
@@ -97,6 +135,10 @@ class DatabaseManager:
         with self._get_connection() as conn:
             save_df.to_sql('news_impact', conn, if_exists='append', index=False, method=self._insert_or_replace)
             conn.commit()
+
+        # Google Drive への自動更新
+        if self.sync_drive_enabled:
+            self.sync_to_drive()
 
     def load_stocks(self, ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
         """DBから株価データをロード"""

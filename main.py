@@ -352,7 +352,7 @@ def run_trade_signal_alert():
 #  5. データベース状態確認
 # ══════════════════════════════════════════════════════════════
 def run_db_inspection():
-    """alphasignal.db のステータスと保持データ件数を表示"""
+    """alphasignal.db のステータスと保持データ件数、Google Drive同期状態を表示"""
     print_separator("データベース状態確認 (alphasignal.db)")
     print()
     db_path = db_manager.db_path
@@ -374,6 +374,27 @@ def run_db_inspection():
     print(f"  ファイルサイズ   : {file_size_kb:.2f} KB")
     print(f"  登録株価レコード : {stock_count:,} 件 ({stock_tickers} 銘柄)")
     print(f"  ニュースインパクト: {news_count:,} 件 ({news_tickers} 銘柄)")
+    print()
+
+    # Google Drive 同期状態
+    sync_status = db_manager.get_sync_status()
+    print("  [Google Drive 同期ステータス]")
+    if sync_status.get("enabled"):
+        if sync_status.get("available"):
+            print("  状態             : 有効 (接続成功)")
+            print(f"  フォルダID       : {sync_status.get('folder_id')}")
+            print(f"  フォルダURL      : https://drive.google.com/drive/folders/{sync_status.get('folder_id')}")
+            if sync_status.get("remote_exists"):
+                print(f"  Drive上ファイルID: {sync_status.get('remote_id')}")
+                print(f"  Drive上最終更新  : {sync_status.get('remote_modified')}")
+                remote_kb = int(sync_status.get('remote_size', 0)) / 1024.0
+                print(f"  Drive上サイズ    : {remote_kb:.2f} KB")
+            else:
+                print("  Drive上ファイル  : 未検出")
+        else:
+            print("  状態             : 接続不可 (認証またはネットワーク設定を確認してください)")
+    else:
+        print("  状態             : 無効 (GOOGLE_DRIVE_SYNC=false)")
     print()
 
 

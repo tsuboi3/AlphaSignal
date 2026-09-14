@@ -39,3 +39,9 @@ data/*_dummy.csv
 # OS
 .DS_Store
 Thumbs.db
+
+# Google Drive Credentials & Tokens
+*credentials*.json
+*token*.json
+service_account*.json
+*.tmp_download
