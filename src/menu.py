@@ -59,6 +59,7 @@ PERIOD_PRESETS = [
     ("カスタム期間を入力", "custom"),
 ]
 
+
 SEPARATOR = "─" * 62
 
 
@@ -66,11 +67,71 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
+def load_project_metadata() -> Dict[str, str]:
+    """AlphaSignal.md からプロジェクトメタデータ（バージョン、更新日等）を読み込む"""
+    meta = {
+        "version": "v1.6.0",
+        "updated": "2026-09-14",
+        "doc_found": "False",
+        "summary": "LightGBM + Transformer + NIS + AlphaCombiner",
+    }
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "AlphaSignal.md"),
+        os.path.join(os.getcwd(), "AlphaSignal.md"),
+        "AlphaSignal.md",
+    ]
+    doc_path = None
+    for p in possible_paths:
+        if os.path.isfile(p):
+            doc_path = p
+            break
+
+    if not doc_path:
+        return meta
+
+    try:
+        with open(doc_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        meta["doc_found"] = "True"
+        meta["path"] = doc_path
+
+        # バージョン抽出
+        v_match = re.search(r'\|\s*\*\*バージョン\*\*\s*\|\s*([^\|]+)\|', content)
+        if v_match:
+            meta["version"] = v_match.group(1).strip()
+
+        # 最終更新日抽出
+        u_match = re.search(r'\|\s*\*\*最終更新\*\*\s*\|\s*([^\|]+)\|', content)
+        if u_match:
+            meta["updated"] = u_match.group(1).strip()
+
+        # 目的抽出
+        p_match = re.search(r'\|\s*\*\*目的\*\*\s*\|\s*([^\|]+)\|', content)
+        if p_match:
+            meta["purpose"] = p_match.group(1).strip()
+
+    except Exception:
+        pass
+
+    return meta
+
+
+# 起動時に自動でメタデータをロード
+PROJECT_META = load_project_metadata()
+
+
 def print_header():
+    ver = PROJECT_META.get("version", "v1.6.0")
     print()
     print("╔══════════════════════════════════════════════════════════╗")
-    print("║          AlphaSignal  株価予測システム  v1.3             ║")
+    title_line = f"AlphaSignal  株価予測システム  {ver}"
+    pad = (56 - len(title_line)) // 2
+    right_pad = 56 - len(title_line) - pad
+    print(f"║{' ' * pad}{title_line}{' ' * right_pad}║")
     print("║   LightGBM + Transformer + NIS + AlphaCombiner           ║")
+    if PROJECT_META.get("doc_found") == "True":
+        print("║   [Single Source of Truth: AlphaSignal.md 読込済]        ║")
     print("╚══════════════════════════════════════════════════════════╝")
     print()
 
@@ -125,6 +186,48 @@ def calc_date_from_preset(preset: str):
     return None, None
 
 
+def display_project_doc():
+    """AlphaSignal.mdの内容をコンソールに表示する"""
+    print_separator("AlphaSignal.md プロジェクト仕様 & 変更履歴")
+    meta = load_project_metadata()
+    doc_path = meta.get("path")
+    if not doc_path or not os.path.exists(doc_path):
+        print("  ⚠ AlphaSignal.md が見つかりませんでした。\n")
+        return
+
+    try:
+        with open(doc_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        print(f"  📄 ファイルパス: {doc_path}")
+        print(f"  📌 バージョン: {meta.get('version')} | 最終更新: {meta.get('updated')}")
+        print(SEPARATOR)
+
+        # 最初の概要・引き継ぎ規則、および変更履歴を中心に抜粋または全表示
+        in_history = False
+        for line in lines:
+            line_str = line.rstrip()
+            if "## 7. 変更履歴" in line_str:
+                in_history = True
+                print("\n" + SEPARATOR)
+                print("  【変更履歴 (Changelog)】")
+                print(SEPARATOR)
+                continue
+
+            if in_history:
+                if line_str.startswith("---") or line_str.startswith("*このドキュメント"):
+                    in_history = False
+                    continue
+                if line_str:
+                    print(f"  {line_str}")
+            elif not in_history and (line_str.startswith("## ") or line_str.startswith("| ") or line_str.startswith(">")):
+                print(f"  {line_str}")
+
+        print("\n" + SEPARATOR)
+    except Exception as e:
+        print(f"  ⚠ 読み込みエラー: {e}")
+
+
 def display_main_menu() -> str:
     """メイン機能選択画面"""
     print_header()
@@ -137,14 +240,15 @@ def display_main_menu() -> str:
     print("  │  4 │ 総合トレード診断・売買判定 (Trade Signal Alert)  │")
     print("  │  5 │ データベース状態確認 & 統計表示                  │")
     print("  │  6 │ 日本株注目100銘柄リスト閲覧 & 検索               │")
-    print("  │  7 │ 終了                                            │")
+    print("  │  7 │ プロジェクト仕様・変更履歴 (AlphaSignal.md)      │")
+    print("  │  8 │ 終了                                            │")
     print("  └────┴─────────────────────────────────────────────────┘")
     print()
     while True:
         choice = input_with_prompt("番号を選択", "1")
-        if choice in ("1", "2", "3", "4", "5", "6", "7"):
+        if choice in ("1", "2", "3", "4", "5", "6", "7", "8"):
             return choice
-        print("  ⚠  1〜7 の番号を入力してください。\n")
+        print("  ⚠  1〜8 の番号を入力してください。\n")
 
 
 def menu_select_company() -> str:

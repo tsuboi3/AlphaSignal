@@ -12,8 +12,8 @@
 | 項目 | 内容 |
 |------|------|
 | **プロジェクト名** | AlphaSignal |
-| **バージョン** | v1.6.0 |
-| **最終更新** | 2026-09-14 |
+| **バージョン** | v1.6.1 |
+| **最終更新** | 2026-09-15 |
 | **目的** | LightGBM + Transformer + ニュースセンチメント分析を組み合わせた株価予測システム |
 | **主要言語** | Python 3.12+ (PyTorch版) |
 | **メインエントリ** | `alphasignal.py` |
@@ -36,6 +36,7 @@ stock_prediction_project/
 ├── alphasignal.py              # 【メインエントリ】対話式メニュー + 予測パイプライン
 ├── main.py                     # 全体統合メイン実行スクリプト
 ├── AlphaSignal.md              # 【本ファイル】プロジェクト管理・AI引き継ぎ文書
+├── AGENTS.md / GEMINI.md       # AIエージェント運用規則（起動時自動読込設定）
 ├── README.md                   # ユーザー向けセットアップ・使い方ガイド
 ├── requirements.txt            # pip 依存ライブラリ一覧
 ├── alphasignal.db              # SQLite データベース（永続化データ）
@@ -118,6 +119,7 @@ stock_prediction_project/
 | 2026-05-26 | v1.4.0 | Jules | システム全体統合設計書 `計画書.md` を作成。`main.py` および `src/menu.py` を再構築し、株価予測、AlphaEngine、AlphaCombiner、総合トレード診断 (Buy/Sell/Hold)、DB確認を提供する対話型CUIメニューを構築。 |
 | 2026-09-14 | v1.5.0 | Gemini CLI | Google Drive 同期連携を実装。`alphasignal.db` を指定のGoogle Drive共有フォルダへ設置。`src/drive_sync.py` を新規作成し、起動時の自動プル（ダウンロード）およびデータ保存時の自動プッシュ（更新）機能を統合。メニューのDB確認画面にもDrive同期ステータス表示を追加。 |
 | 2026-09-14 | v1.6.0 | Gemini CLI | Googleスプレッドシート（japan_stocks_capital_gain_100）から日本株キャピタルゲイン注目100銘柄をインポート（data/japan_stocks_100.json, csv）。セクター別ブラウズ・銘柄検索・エイリアス自動解決を提供する src/japan_stocks.py を実装し、メインメニューおよび銘柄選択UIに統合。ユニットテスト追加（全38件通過）。 |
+| 2026-09-15 | v1.6.1 | Gemini CLI | AIセッション起動時およびプログラム起動時に `AlphaSignal.md` を自動読込する仕組みを構築。ワークスペース共通ルール (`AGENTS.md`, `GEMINI.md`) を設置しAI起動時の必読規則を自動化。さらに `src/menu.py` に動的メタデータロード (`load_project_metadata`) と仕様・履歴閲覧メニュー（項目7）を実装。 |
 
 ---
 

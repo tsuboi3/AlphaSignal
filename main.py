@@ -40,7 +40,7 @@ from src.database import db_manager
 from src.menu import (
     display_main_menu, menu_select_company, menu_select_period,
     run_interactive_menu, menu_post_run, print_header, print_separator,
-    SEPARATOR, input_with_prompt, resolve_ticker
+    SEPARATOR, input_with_prompt, resolve_ticker, display_project_doc
 )
 from src.japan_stocks import interactive_select_japan_stock
 
@@ -461,6 +461,9 @@ def main():
                     menu_post_run(selected_ticker, 'results')
             input("\n  Enterキーを押してメインメニューに戻ります...")
         elif choice == "7":
+            display_project_doc()
+            input("\n  Enterキーを押してメインメニューに戻ります...")
+        elif choice == "8":
             print("\n  AlphaSignal を終了します。\n")
             break
 
